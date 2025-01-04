@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="cs">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat s AI</title>
+</head>
+
+<body>
+    <div id="chat-widget" style="max-width: 600px; margin: 20px auto; font-family: Arial, sans-serif;">
+        <div id="stats" style="margin-bottom: 10px; font-size: 14px;">
+            <strong>Počet tokenů:</strong> <span id="token-count">0</span> |
+            <strong>Počet zpráv:</strong> <span id="message-count">0</span>
+        </div>
+        <div id="chat-history"
+            style="border: 1px solid #ccc; padding: 15px; height: 300px; overflow-y: auto; background: #fff; border-radius: 8px;">
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <input type="text" id="user-input" placeholder="Zadejte zprávu"
+                style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
+            <button id="send-button"
+                style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Odeslat</button>
+            <button id="reset-button"
+                style="padding: 8px 16px; background: #ff4d4d; color: white; border: none; border-radius: 4px; cursor: pointer;">Nový
+                chat</button>
+        </div>
+    </div>
+
+    <script>
+        const endpointUrl = 'https://script.google.com/macros/s/AKfycbzjySCN8HXP5GUGDmfPss2buVQJPF65MEf2AIjHktLt70eg_PF_jMDw8R1lKq-FLIgC/exec';
+        const apiKey = 'K0CKA.lez3.d1rO';
+        let conversationHistory = []; // Uchování historie na frontendu
+        let tokenCount = 0; // Počet tokenů
+        let messageCount = 0; // Počet zpráv uživatele
+
+        // Přidání podpory Enter klávesy
+        document.getElementById('user-input').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Zabrání výchozímu chování
+                document.getElementById('send-button').click(); // Simuluje kliknutí na tlačítko "Odeslat"
+            }
+        });
+
+        document.getElementById('send-button').addEventListener('click', async () => {
+            const userMessage = document.getElementById('user-input').value.trim();
+            if (!userMessage) return;
+
+            // Přidání zprávy uživatele do historie
+            conversationHistory.push({ role: 'user', content: userMessage });
+            addMessageToChat('user', userMessage);
+            messageCount++;
+
+            try {
+                const response = await fetch(endpointUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        apiKey: apiKey,
+                        history: conversationHistory, // Odesíláme celou historii
+                        reset: false
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    addMessageToChat('error', data.error);
+                } else {
+                    // Přidání odpovědi AI do historie
+                    conversationHistory.push({ role: 'assistant', content: data.reply });
+                    addMessageToChat('ai', data.reply);
+
+                    // Aktualizace počtu tokenů
+                    tokenCount = data.tokens;
+                    updateStats();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                addMessageToChat('error', 'Došlo k chybě při komunikaci s API.');
+            }
+
+            document.getElementById('user-input').value = '';
+        });
+
+        document.getElementById('reset-button').addEventListener('click', () => {
+            conversationHistory = []; // Reset historie
+            tokenCount = 0; // Reset tokenů
+            messageCount = 0; // Reset zpráv
+            updateStats();
+            clearChatHistory();
+            addMessageToChat('ai', 'Kontext byl resetován. Můžete začít nový chat.');
+        });
+
+        function addMessageToChat(type, message) {
+            const chatHistory = document.getElementById('chat-history');
+            const messageDiv = document.createElement('div');
+            messageDiv.style.padding = '8px';
+            messageDiv.style.margin = '8px 0';
+            messageDiv.style.borderRadius = '4px';
+
+            if (type === 'user') {
+                messageDiv.style.backgroundColor = '#e3f2fd';
+                messageDiv.innerHTML = `<strong>Vy:</strong> ${message}`;
+            } else if (type === 'ai') {
+                messageDiv.style.backgroundColor = '#f5f5f5';
+                messageDiv.innerHTML = `<strong>AI:</strong> ${message}`;
+            } else if (type === 'error') {
+                messageDiv.style.backgroundColor = '#ffebee';
+                messageDiv.style.color = '#c62828';
+                messageDiv.innerHTML = `<strong>Chyba:</strong> ${message}`;
+            }
+
+            chatHistory.appendChild(messageDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function updateStats() {
+            document.getElementById('token-count').textContent = tokenCount;
+            document.getElementById('message-count').textContent = messageCount;
+        }
+
+        function clearChatHistory() {
+            document.getElementById('chat-history').innerHTML = '';
+        }
+    </script>
+</body>
+
+</html>
